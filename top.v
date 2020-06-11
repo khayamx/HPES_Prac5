@@ -1,0 +1,109 @@
+
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// 
+//////////////////////////////////////////////////////////////////////////////////
+module top(
+    // These signal names are for the nexys A7. 
+    // Check your constraint file to get the right names
+    input  CLK100MHZ,
+   // input [7:0] SW,
+    output AUD_PWM, 
+    output AUD_SD
+   // output [2:0] LED
+    );
+    
+    // Toggle arpeggiator enabled/disabled
+    //wire arp_switch;
+    //Debounce change_state (CLK100MHZ, BTNL, arp_switch); // ensure your button choice is correct
+    
+    // Memory IO
+    reg ena = 1;
+    reg wea = 0;
+    reg [7:0] addra=0; //0;
+    reg [10:0] dina=0; //We're not putting data in, so we can leave this unassigned
+    wire [10:0] douta;
+   
+    
+    // Instantiate block memory here
+    // Copy from the instantiation template and change signal names to the ones under "MemoryIO"
+//    blk_mem_gen_0 BRAM (
+//  .clka(CLK100MHZ), //.clka(clka),    // input wire clka
+//  .ena(ena),      // input wire ena
+//  .wea(wea),      // input wire [0 : 0] wea
+//  .addra(addra),  // input wire [7 : 0] addra
+//  .dina(dina),    // input wire [10 : 0] dina
+//  .douta(douta)  // output wire [10 : 0] douta
+//);
+
+blk_mem_gen_2 BRAM (
+  .clka(CLK100MHZ), //.clka(clka),    // input wire clka
+  .ena(ena),      // input wire ena
+  .wea(wea),      // input wire [0 : 0] wea
+  .addra(addra),  // input wire [7 : 0] addra
+  .dina(dina),    // input wire [10 : 0] dina
+  .douta(douta)  // output wire [10 : 0] douta
+);
+ //   PWM Out - this gets tied to the BRAM
+    reg [10:0] PWM;
+  
+    // Instantiate the PWM module
+    // PWM should take in the clock, the data from memory
+    // PWM should output to AUD_PWM (or whatever the constraints file uses for the audio out.
+    pwm_module pwm2 ( CLK100MHZ, PWM, AUD_PWM);
+    
+    // Devide our clock down
+    reg [12:0] clkdiv = 0;
+    
+    // keep track of variables for implementation
+    reg [26:0] note_switch = 0;
+    reg [1:0] note = 0;
+    reg [8:0] f_base = 0;
+    
+    //generate table
+    reg[2:0] state =0;
+   
+    
+        
+
+always @(posedge CLK100MHZ) begin 
+
+case(state)
+0: begin
+        
+        PWM<=douta;
+        addra<=addra+1;
+        if(addra==63)
+          state <=1;
+    end
+
+1:begin
+      PWM <= douta;
+      addra <= addra - 1;
+      if(addra==0)
+      state<=2;
+      
+  end
+  
+2:begin
+   PWM<=1023 -(douta-1024);
+   addra<=addra+1;
+   if(addra==63)
+   state<=3; 
+end
+3:begin
+   PWM<=1023 -(douta-1024);
+   addra<=addra-1;
+   if(addra==0)begin
+   state<=0; 
+    end
+end
+
+endcase;
+ 
+end
+assign AUD_SD = 1'b1;  // Enable audio out
+//assign LED[1:0] = note[1:0]; // Tie FRM state to LEDs so we can see and hear changes
+
+
+endmodule
